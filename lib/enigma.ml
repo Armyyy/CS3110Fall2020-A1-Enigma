@@ -72,19 +72,12 @@ let map_l_to_r wiring top_letter input_pos =
 let map_refl wiring input_pos = map_r_to_l wiring 'A' input_pos
 
 (* Step 7 *)
-let map_plug plugs c =
-  let open Printf in
-  let acc_fun acc (a, b) = sprintf "%c%c%s" a b acc in
-  let plug_string = List.fold_left acc_fun "" plugs in
-  if String.contains plug_string c then
-    let index = String.index plug_string c in
-    plug_string.[index - (index mod 2 * 2 - 1)]
-  (*
-    let index = String.index plug_string c in
-    if index mod 2 = 0 plug_string.[index + 1]
-    else plug_string.[index - 1]
-    *)
-  else c
+let rec map_plug plugs c = match plugs with
+  | [] -> c
+  | (fst, snd)::t ->
+    if fst = c then snd
+    else if snd = c then fst
+    else map_plug t c
 
 
 type rotor = {
