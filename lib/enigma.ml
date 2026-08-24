@@ -1,5 +1,3 @@
-exception CharOutOfBound
-
 (* Implement each function below. Delete the [failwith] and write the
    real definition. Types and specs live in enigma.mli -- read them first,
    let the type drive the implementation. *)
@@ -8,8 +6,34 @@ exception CharOutOfBound
 let index c = Char.code c - Char.code 'A'
 
 (* Step 5 *)
-let map_r_to_l _wiring _top_letter _input_pos =
-  failwith "map_r_to_l: Unimplemented"
+(*
+0 2 4 6 8 10  14  18  22 25 (contact position)
+| | | | | |   |   |   |  |
+v v v v v v   v   v   v  v
+BDFHJLCPRTXVZNYEIWGAKMUSQO (rotor's wiring)
+  ^           ^
+  |           |
+  |           offset = index top_letter
+  |                  = index 'O'
+  |                  = 14
+  |
+  contact_out = (offset + input_pos) mod 26
+              = (14 + 14) mod 26
+              = 2
+
+  output = (index wiring.[contact_out] - offset) mod 26
+         = (index wiring.[2] - 14) mod 26
+         = (index 'F' - 14) mod 26
+         = (5 - 14) mod 26
+         = (-9) mod 26
+         = 17
+*)
+let map_r_to_l wiring top_letter input_pos =
+  let offset = index top_letter in
+  let contact_out = (offset + input_pos) mod 26 in
+  let output = (index wiring.[contact_out] - offset) mod 26 in
+  if output < 0 then output + 26 else output
+
 
 let map_l_to_r _wiring _top_letter _input_pos =
   failwith "map_l_to_r: Unimplemented"
