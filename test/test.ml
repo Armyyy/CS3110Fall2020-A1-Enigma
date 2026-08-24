@@ -447,22 +447,163 @@ let step_tests = [
 ]
 
 (*
-let cipher_tests = []
+  The handout's Step 10 machine: reflector B, rotors I-II-III left to right
+  carrying their historical turnovers, top letters F-U-N, one cable A<->Z.
 *)
+let ocaml_config = {
+  refl = refl_b;
+  rotors = [
+    oriented ~turnover:'Q' rotor_i   'F';
+    oriented ~turnover:'E' rotor_ii  'U';
+    oriented ~turnover:'V' rotor_iii 'N'
+  ];
+  plugboard = [('A', 'Z')]
+}
 
+(*
+  A message long enough to drive the rightmost rotor past its turnover
+  several times, so the tests below exercise stepping, not just wiring.
+*)
+let long_message = String.init 60 (fun i -> letter (i * 7 mod 26))
 
-let suite =
-  "enigma test suite"
-  >::: List.flatten
-         [
-           index_tests;
-           map_r_to_l_tests;
-           map_l_to_r_tests;
-           map_refl_tests;
-           map_plug_tests;
-           cipher_char_tests;
-           step_tests;
-(*         cipher_tests; *)
-         ]
+let distinct_chars s = s
+  |> String.to_seq
+  |> List.of_seq
+  |> List.sort_uniq compare
+
+let cipher_tests = [
+  (* ---- the handout's worked case ---- *)
+
+  ("handout: YNGXQ deciphers to a language" >:: fun _ ->
+    assert_equal
+      ("OCAML")
+      ("YNGXQ" |> cipher ocaml_config)
+  );
+
+  (*
+    Same machine, run backwards: the receiving operator
+    sets the same key and retypes the ciphertext.
+  *)
+  ("handout: OCAML enciphers back to YNGXQ" >:: fun _ ->
+    assert_equal
+      ("YNGXQ")
+      ("OCAML" |> cipher ocaml_config)
+  );
+
+  (* ---- degenerate and ordering cases ---- *)
+
+  ("empty string ciphers to empty string" >:: fun _ ->
+    assert_equal
+      ("")
+      ("" |> cipher ocaml_config)
+  );
+
+  (*
+    The machine steps BEFORE enciphering, so a one-character message must
+    agree with cipher_char applied to the already-stepped config.
+  *)
+  ("steps before enciphering the first letter" >:: fun _ ->
+    assert_equal
+      ('Y' |> cipher_char (step ocaml_config) |> String.make 1)
+      ("Y" |> cipher ocaml_config)
+  );
+
+  ("output has the same length as input" >:: fun _ ->
+    assert_equal
+      (long_message |> String.length)
+      (long_message |> cipher ocaml_config |> String.length)
+  );
+
+  (* ---- properties over a long message ---- *)
+
+  (* Self-inverse, now end to end: step, cipher_char and every function
+     underneath, across 60 letters and several turnovers. *)
+  ("self-inverse over a long message" >:: fun _ ->
+    let cfg = ocaml_config in
+    assert_equal
+      (long_message)
+      (long_message |> cipher cfg |> cipher cfg)
+  );
+
+  ("self-inverse with an empty plugboard" >:: fun _ ->
+    let cfg = {ocaml_config with plugboard = []} in
+    assert_equal
+      (long_message)
+      (long_message |> cipher cfg |> cipher cfg)
+  );
+
+  ("self-inverse with no rotors" >:: fun _ ->
+    let cfg = { ocaml_config with rotors = [] } in
+    assert_equal
+      (long_message)
+      (long_message |> cipher cfg |> cipher cfg)
+  );
+
+  (* No letter ever enciphers to itself, position by position. *)
+  ("no letter ciphers to itself" >:: fun _ ->
+    let out = cipher ocaml_config long_message in
+    assert_bool "some position was unchanged"
+      (List.for_all
+         (fun i -> long_message.[i] <> out.[i])
+         (List.init (String.length long_message) Fun.id))
+  );
+
+  (*
+    Enigma is polyalphabetic: the rotors move, so a run of one letter must
+    NOT encipher to a run of one letter. This is what separates cipher from
+    "map cipher_char over the string".
+  *)
+  ("repeated letter gives a varied output" >:: fun _ ->
+    let out = cipher ocaml_config (String.make 30 'A') in
+    assert_bool "output was monoalphabetic"
+      (List.length (distinct_chars out) > 1));
+
+  (*
+    [cipher] is a function, not a machine with hidden state: running it
+    twice on the same config must give the same answer.
+  *)
+  ("cipher is pure" >:: fun _ ->
+    assert_equal
+      (long_message |> cipher ocaml_config)
+      (long_message |> cipher ocaml_config)
+  );
+
+  (* Ciphering leaves the caller's config untouched. *)
+  ("cipher does not disturb its config" >:: fun _ ->
+    let before = ocaml_config |> get_state in
+    let _ = long_message |> cipher ocaml_config in
+    assert_equal
+      before
+      (ocaml_config |> get_state)
+  );
+
+  (*
+    Starting one letter earlier gives a different ciphertext: the key
+    setting actually matters.
+  *)
+  ("a different key gives a different ciphertext" >:: fun _ ->
+    let other = {
+      ocaml_config with
+      rotors = [
+        oriented ~turnover:'Q' rotor_i   'F';
+        oriented ~turnover:'E' rotor_ii  'U';
+        oriented ~turnover:'V' rotor_iii 'M'
+      ]
+    }
+    in assert_bool
+      ("key setting had no effect")
+      (cipher ocaml_config long_message <> cipher other long_message));
+]
+
+let suite = "enigma test suite" >::: List.flatten [
+    index_tests;
+    map_r_to_l_tests;
+    map_l_to_r_tests;
+    map_refl_tests;
+    map_plug_tests;
+    cipher_char_tests;
+    step_tests;
+    cipher_tests;
+  ]
 
 let () = run_test_tt_main suite

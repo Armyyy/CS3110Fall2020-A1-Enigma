@@ -145,4 +145,14 @@ let step config = {
 }
 
 (* Step 10 *)
-let cipher _config _s = failwith "cipher: Unimplemented"
+let step_and_encrypt acc char = let config = step (snd acc) in
+  (cipher_char config char :: fst acc, config)
+
+let cipher (config: config) (s: string): string = s
+  |> String.fold_left step_and_encrypt ([], config)
+  |> fst
+  |> List.rev
+  |> List.to_seq
+  |> String.of_seq
+
+let _hours_worked = 0
