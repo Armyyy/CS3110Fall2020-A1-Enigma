@@ -147,14 +147,13 @@ let is_permutation cfg =
   [oriented w top] is rotor [w] installed with [top] showing.
   [turnover] is unused until Step 9, so it is arbitrary here.
 *)
-let oriented w top = {
+let oriented ?(turnover = 'Z') w top = {
   rotor = {
     wiring = w;
-    turnover = 'Z'
+    turnover = turnover
   };
   top_letter = top
 }
-
 
 let handout_config = {
   refl = refl_b;
@@ -315,10 +314,139 @@ let cipher_char_tests = [
         )
     );
   ]
+
+let get_state config = config.rotors
+  |> List.map (fun a -> a.top_letter)
+  |> List.to_seq
+  |> String.of_seq
+
 (*
+  [iii_ii_i state] is the machine with rotors III-II-I installed left to
+  right, carrying their historical turnovers (V, E, Q), showing the three
+  top letters of [state].
+*)
+let iii_ii_i state =
+  { handout_config with
+    rotors = [
+      oriented ~turnover:'V' rotor_iii state.[0];
+      oriented ~turnover:'E' rotor_ii  state.[1];
+      oriented ~turnover:'Q' rotor_i   state.[2]
+    ]
+  }
 
-let step_tests = []
+let trace state n = let rec loop cfg i acc =
+    if i = 0 then List.rev acc
+    else loop (step cfg) (i - 1) (get_state cfg::acc)
+  in loop (iii_ii_i state) n []
 
+let step_tests = [
+  (* ---- Rule 1: the rightmost rotor always steps ---- *)
+
+  ("rule 1: lone rotor steps" >:: fun _ -> assert_equal "B"
+    (get_state (step
+      {handout_config with rotors = [oriented ~turnover:'Q' rotor_i 'A']}
+    ))
+  );
+
+  ("rule 1: top letter wraps Z to A" >:: fun _ -> assert_equal "A"
+    (get_state (step
+      {handout_config with rotors = [oriented ~turnover:'Q' rotor_i 'Z']}
+    ))
+  );
+
+  ("rule 1: no rotors, nothing to step" >:: fun _ -> assert_equal ""
+    (get_state (step
+      {handout_config with rotors = []}
+    ))
+  );
+
+  (* ---- Rule 2: when at its turnover, also takes its left neighbour ---- *)
+
+  ("rule 2: turnover drags left neighbour" >:: fun _ -> assert_equal "BR"
+    (get_state (step
+      {
+        handout_config with
+        rotors = [
+          oriented ~turnover:'E' rotor_ii 'A';
+          oriented ~turnover:'Q' rotor_i  'Q'
+        ]
+      }
+    ))
+  );
+
+  (*
+    Rule 2 explicitly does not apply to the leftmost rotor: it has no left
+    neighbour, so its own turnover never makes it step.
+  *)
+  ("rule 2: leftmost at own turnover no step" >:: fun _ -> assert_equal "EB"
+    (get_state (step
+      {
+        handout_config with
+        rotors = [
+          oriented ~turnover:'E' rotor_ii 'E';  (* at its turnover, leftmost *)
+          oriented ~turnover:'Q' rotor_i  'A'
+        ]
+      }
+    ))
+  );
+
+  (* ---- Rule 3: no rotor steps twice ---- *)
+
+  (*
+    Rotor I is at its turnover, so it drags rotor II. Rotor II is also at
+    its own turnover, so it drags rotor III. Rule 3 caps rotor II at one step.
+  *)
+  ("rule 3: middle rotor steps at most once" >:: fun _ -> assert_equal "BFR"
+    (get_state (step (iii_ii_i "AEQ")))
+  );
+
+  (* ---- the handout's two worked sequences ---- *)
+
+  ("handout example 1: KDO..." >:: fun _ ->
+    assert_equal ["KDO"; "KDP"; "KDQ"; "KER"; "LFS"; "LFT"; "LFU"]
+      (trace "KDO" 7)
+  );
+
+  ("handout example 2: VDP..." >:: fun _ ->
+    assert_equal ["VDP"; "VDQ"; "VER"; "WFS"; "WFT"]
+      (trace "VDP" 5)
+  );
+
+  (* ---- structural properties ---- *)
+
+  (* [step] returns a new config; the original must be untouched. *)
+  ("step does not mutate its argument" >:: fun _ ->
+    let before = iii_ii_i "KDO" in
+    let _ = step before in
+    assert_equal "KDO" (get_state before)
+  );
+
+  ("step changes only the rotors" >:: fun _ ->
+    let before = { (iii_ii_i "KDO") with plugboard = [('A','M')] } in
+    let after = step before in
+    assert_equal before.refl after.refl;
+    assert_equal before.plugboard after.plugboard;
+    assert_equal (List.length before.rotors) (List.length after.rotors)
+  );
+
+  ("step preserves wiring and turnovers" >:: fun _ ->
+    let before = iii_ii_i "KDO" in
+    let after = step before in
+    assert_equal
+      (List.map (fun r -> r.rotor) before.rotors)
+      (List.map (fun r -> r.rotor) after.rotors)
+  );
+
+  (* A lone rotor has period 26: 26 steps return it to where it started. *)
+  ("lone rotor has period 26" >:: fun _ ->
+    let start = {
+      handout_config with rotors = [oriented ~turnover:'Q' rotor_i 'A']
+    } in
+    let rec times n cfg = if n = 0 then cfg else times (n - 1) (step cfg) in
+    assert_equal "A" (get_state (times 26 start)));
+]
+
+(*
 let cipher_tests = []
 *)
 
@@ -333,7 +461,7 @@ let suite =
            map_refl_tests;
            map_plug_tests;
            cipher_char_tests;
-(*         step_tests; *)
+           step_tests;
 (*         cipher_tests; *)
          ]
 

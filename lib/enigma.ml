@@ -122,7 +122,27 @@ let cipher_char config c =
   map_plug config.plugboard (letter l_to_r_out)
 
 (* Step 9 *)
-let step _config = failwith "step: Unimplemented"
+let next_char c = letter (wrap (index c + 1))
+let is_notch o_router = o_router.top_letter = o_router.rotor.turnover
+
+let rotate rotors =
+  let rec loop previous_is_notch acc = function
+    | [] -> acc
+    | h::t ->
+      let not_left_most = t <> [] in
+      let current_is_notch = is_notch h in
+      if (previous_is_notch || (current_is_notch && not_left_most)) then loop
+        (current_is_notch)
+        ({ h with top_letter = next_char h.top_letter}::acc) t
+      else loop
+        (current_is_notch)
+        (h::acc) t
+  in loop true [] (List.rev rotors)
+
+let step config = {
+  config
+  with rotors = rotate config.rotors
+}
 
 (* Step 10 *)
 let cipher _config _s = failwith "cipher: Unimplemented"
