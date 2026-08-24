@@ -57,6 +57,65 @@ let map_refl_tests = [
     assert_bool "reflector C" (is_involution "FVPJIAOYEDRZXWGCTKUQSBNMHL"));
 ]
 
+let full_board =
+  [ ('A','Z'); ('B','Y'); ('C','X'); ('D','W'); ('E','V'); ('F','U'); ('G','T');
+    ('H','S'); ('I','R'); ('J','Q'); ('K','P'); ('L','O'); ('M','N') ]
+
+(* The plugboard is self-inverse: unplugging a letter and plugging it back
+   returns the original. Holds for every letter, on any valid board. *)
+let plug_self_inverse board =
+  List.for_all
+    (fun i -> let c = Char.chr (i + Char.code 'A') in
+              map_plug board (map_plug board c) = c)
+    (List.init 26 Fun.id)
+
+let map_plug_tests = [
+  ("plug empty board"            >:: fun _ ->
+    assert_equal 'A' (map_plug [] 'A'));
+  ("plug 1 cable, left side"     >:: fun _ ->
+    assert_equal 'Z' (map_plug [('A','Z')] 'A'));
+  ("plug 1 cable, right side"    >:: fun _ ->
+    assert_equal 'A' (map_plug [('A','Z')] 'Z'));
+  ("plug 2 cables, tail cable"   >:: fun _ ->
+    assert_equal 'Y' (map_plug [('A','Z');('X','Y')] 'X'));
+  ("plug 2 cables, head cable"   >:: fun _ ->
+    assert_equal 'X' (map_plug [('X','Y');('A','Z')] 'Y'));
+
+  ("plug unplugged letter"       >:: fun _ ->
+    assert_equal 'M' (map_plug [('A','Z');('X','Y')] 'M'));
+  ("plug deep in list, left"     >:: fun _ ->
+    assert_equal 'N' (map_plug full_board 'M'));
+  ("plug deep in list, right"    >:: fun _ ->
+    assert_equal 'M' (map_plug full_board 'N'));
+  ("plug full board, first"      >:: fun _ ->
+    assert_equal 'Z' (map_plug full_board 'A'));
+
+  ("plug full board is total"    >:: fun _ ->
+    assert_bool "full board" (plug_self_inverse full_board));
+  ("plug partial board is total" >:: fun _ ->
+    assert_bool "partial board" (plug_self_inverse [('A','Z');('X','Y')]));
+]
+
+(*
+let cipher_char_tests = [
+    (* Identity machine: no plugs, no rotors, identity reflector. *)
+    ( "identity machine" >:: fun _ ->
+      assert_equal 'A'
+        (cipher_char
+           {
+             refl = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+             rotors = [];
+             plugboard = [];
+           }
+           'A') );
+  ]
+
+let step_tests = []
+
+let cipher_tests = []
+*)
+
+
 let suite =
   "enigma test suite"
   >::: List.flatten
@@ -65,7 +124,7 @@ let suite =
            map_r_to_l_tests;
            map_l_to_r_tests;
            map_refl_tests;
-(*         map_plug_tests; *)
+           map_plug_tests;
 (*         cipher_char_tests; *)
 (*         step_tests; *)
 (*         cipher_tests; *)
