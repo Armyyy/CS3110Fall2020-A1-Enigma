@@ -1,6 +1,21 @@
 open OUnit2
 open Enigma
 
+(* ---- shared fixtures: the historical Enigma I components ---- *)
+let rotor_i = "EKMFLGDQVZNTOWYHXUSPAIBRCJ"
+let rotor_ii = "AJDKSIRUXBLHWTMCQGZNPYFVOE"
+let rotor_iii = "BDFHJLCPRTXVZNYEIWGAKMUSQO"
+
+let refl_id = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+let refl_b = "YRUHQSLDPXNGOKMIEBFZCWVJAT"
+
+(*
+  [letter i] is the [i]th letter of the alphabet. Enigma has its own private
+  [letter], but it is not exported by enigma.mli, so the tests keep a copy.
+*)
+let letter i = Char.chr (i + Char.code 'A')
+let alphabet = List.init 26 letter
+
 let index_tests = [
   ("index A" >:: fun _ -> assert_equal  0 (index 'A'));
   ("index B" >:: fun _ -> assert_equal  1 (index 'B'));
@@ -31,9 +46,11 @@ let map_l_to_r_tests = [
     assert_equal 14 (map_l_to_r "EKMFLGDQVZNTOWYHXUSPAIBRCJ" 'F' 10));
 ]
 
-(* [is_involution w] holds when [map_refl w] undoes itself at every
-   position, i.e. w(w(i)) = i for all i in 0..25. That property is what
-   makes a wiring specification a valid *reflector* specification. *)
+(*
+  [is_involution w] holds when [map_refl w] undoes itself at every
+  position, i.e. w(w(i)) = i for all i in 0..25. That property is what
+  makes a wiring specification a valid *reflector* specification.
+*)
 let is_involution w =
   List.for_all (fun i -> map_refl w (map_refl w i) = i) (List.init 26 Fun.id)
 
@@ -61,8 +78,10 @@ let full_board =
   [ ('A','Z'); ('B','Y'); ('C','X'); ('D','W'); ('E','V'); ('F','U'); ('G','T');
     ('H','S'); ('I','R'); ('J','Q'); ('K','P'); ('L','O'); ('M','N') ]
 
-(* The plugboard is self-inverse: unplugging a letter and plugging it back
-   returns the original. Holds for every letter, on any valid board. *)
+(*
+  The plugboard is self-inverse: unplugging a letter and plugging it back
+  returns the original. Holds for every letter, on any valid board.
+*)
 let plug_self_inverse board =
   List.for_all
     (fun i -> let c = Char.chr (i + Char.code 'A') in
@@ -96,19 +115,207 @@ let map_plug_tests = [
     assert_bool "partial board" (plug_self_inverse [('A','Z');('X','Y')]));
 ]
 
+
+(* ---- 3 properties, each checked across all 26 input letters ---- *)
+
 (*
+  Enigma is self-inverse: enciphering the ciphertext under the same
+  configuration recovers the plaintext.
+
+  This is why the receiving operator
+  could decrypt by simply retyping what they received.
+*)
+let self_inverse cfg =
+  List.for_all (fun c -> cipher_char cfg (cipher_char cfg c) = c) alphabet
+
+(*
+  No letter ever enciphers to itself.
+  Follows from the reflector being fixed-point-free.
+*)
+let no_fixed_point cfg =
+  List.for_all (fun c -> cipher_char cfg c <> c) alphabet
+
+(* The cipher is a permutation of the alphabet: 26 distinct outputs. *)
+let is_permutation cfg =
+  List.length (
+    List.sort_uniq
+      compare
+      (List.map (cipher_char cfg) alphabet)
+  ) = 26
+
+(*
+  [oriented w top] is rotor [w] installed with [top] showing.
+  [turnover] is unused until Step 9, so it is arbitrary here.
+*)
+let oriented w top = {
+  rotor = {
+    wiring = w;
+    turnover = 'Z'
+  };
+  top_letter = top
+}
+
+
+let handout_config = {
+  refl = refl_b;
+  rotors = [
+    oriented rotor_i 'A';
+    oriented rotor_ii 'A';
+    oriented rotor_iii 'A'
+  ];
+  plugboard = []
+}
+
 let cipher_char_tests = [
     (* Identity machine: no plugs, no rotors, identity reflector. *)
     ( "identity machine" >:: fun _ ->
       assert_equal 'A'
         (cipher_char
-           {
+           { (* config *)
              refl = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
              rotors = [];
              plugboard = [];
            }
-           'A') );
+           'A'
+        )
+    );
+
+    ( "example"          >:: fun _ ->
+      assert_equal 'P'
+        (cipher_char
+           {
+             refl = "YRUHQSLDPXNGOKMIEBFZCWVJAT";
+             rotors = [
+               {
+                 rotor = {
+                   wiring = "EKMFLGDQVZNTOWYHXUSPAIBRCJ";
+                   turnover = 'Z'
+                 };
+                 top_letter = 'A'
+               };
+               {
+                 rotor = {
+                   wiring = "AJDKSIRUXBLHWTMCQGZNPYFVOE";
+                   turnover = 'Z'
+                };
+                 top_letter = 'A'
+               };
+               {
+                 rotor = {
+                   wiring = "BDFHJLCPRTXVZNYEIWGAKMUSQO";
+                   turnover = 'Z'
+                };
+                 top_letter = 'A'
+               };
+             ];
+             plugboard = [];
+           }
+           'G'
+        )
+    );
+
+    (* The handout's full Step 8 table, all 26 letters at once:
+         input:  ABCDEFGHIJKLMNOPQRSTUVWXYZ
+         output: UEJOBTPZWCNSRKDGVMLFAQIYXH *)
+    ( "handout full alphabet table" >:: fun _ ->
+      let expected = "UEJOBTPZWCNSRKDGVMLFAQIYXH" in
+      assert_bool "every letter matches the handout table"
+        (List.for_all
+           (fun i -> cipher_char handout_config (letter i) = expected.[i])
+           (List.init 26 Fun.id)
+        )
+    );
+
+    (* A plugboard must be crossed on the way out as well as the way in.
+       With A<->Z cabled and nothing else in the machine, 'A' plugs to 'Z',
+       passes through unchanged, then plugs back to 'A'. *)
+    ( "plugboard applied on both sides" >:: fun _ ->
+      assert_equal 'A'
+        (cipher_char
+           {
+             refl = refl_id;
+             rotors = [];
+             plugboard = [('A', 'Z')]
+           }
+           'A'
+        )
+    );
+
+    (* --- properties over all 26 letters --- *)
+
+    ( "self-inverse: handout config" >:: fun _ ->
+      assert_bool "handout"
+        (self_inverse handout_config)
+    );
+
+    ( "self-inverse: with plugboard" >:: fun _ ->
+      assert_bool "plugged"
+        (self_inverse {handout_config with plugboard = [('A', 'M');('Q', 'X')]})
+    );
+
+    ( "self-inverse: staggered top letters" >:: fun _ ->
+      assert_bool "staggered"
+        (self_inverse
+           {
+             handout_config with
+             rotors = [
+               oriented rotor_i 'Q';
+               oriented rotor_ii 'E';
+               oriented rotor_iii 'V'
+             ]
+           }
+        )
+    );
+
+    ( "self-inverse: no rotors" >:: fun _ ->
+      assert_bool "bare"
+        (self_inverse {refl = refl_b; rotors = []; plugboard = []})
+    );
+
+    ( "self-inverse: duplicate rotors" >:: fun _ ->
+      assert_bool "dupes"
+        (self_inverse
+           {
+             handout_config with
+             rotors = [
+               oriented rotor_i 'A';
+               oriented rotor_i 'A'
+             ]
+           }
+        )
+    );
+
+    ( "no letter ciphers to itself" >:: fun _ ->
+      assert_bool "handout"
+        (no_fixed_point handout_config)
+    );
+
+    ( "no fixed point: with plugboard" >:: fun _ ->
+      assert_bool "plugged"
+        (no_fixed_point
+           {handout_config with plugboard = [('A', 'M');('Q', 'X')]}
+        )
+    );
+
+    ( "cipher is a permutation" >:: fun _ ->
+      assert_bool "handout"
+        (is_permutation handout_config)
+    );
+
+    ( "permutation: staggered top letters" >:: fun _ ->
+      assert_bool "staggered"
+        (is_permutation
+           { handout_config with
+             rotors = [
+               oriented rotor_i 'Q';
+               oriented rotor_ii 'E';
+               oriented rotor_iii 'V'
+             ]
+           }
+        )
+    );
   ]
+(*
 
 let step_tests = []
 
@@ -125,7 +332,7 @@ let suite =
            map_l_to_r_tests;
            map_refl_tests;
            map_plug_tests;
-(*         cipher_char_tests; *)
+           cipher_char_tests;
 (*         step_tests; *)
 (*         cipher_tests; *)
          ]

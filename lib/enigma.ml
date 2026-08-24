@@ -101,7 +101,25 @@ type config = {
      map_rotors_r_to_l : oriented_rotor list -> int -> int
      map_rotors_l_to_r : oriented_rotor list -> int -> int
    then look for the common helper hiding inside both. *)
-let cipher_char _config _c = failwith "cipher_char: Unimplemented"
+
+let rotor_traversal rotors input_pos f = let rec loop acc = function
+  | [] -> acc
+  | {rotor = {wiring = w; _}; top_letter = top}::t
+    -> loop (f w top acc) t
+  in loop input_pos rotors
+
+let map_rotors_r_to_l rotors input_pos = let reversed = List.rev rotors in
+  rotor_traversal reversed input_pos map_r_to_l
+
+let map_rotors_l_to_r rotors input_pos =
+  rotor_traversal rotors input_pos map_l_to_r
+
+let cipher_char config c =
+  let mapped_c = map_plug config.plugboard c in
+  let r_to_l_out = map_rotors_r_to_l config.rotors (index mapped_c) in
+  let reflected = map_refl config.refl r_to_l_out in
+  let l_to_r_out = map_rotors_l_to_r config.rotors (reflected) in
+  map_plug config.plugboard (letter l_to_r_out)
 
 (* Step 9 *)
 let step _config = failwith "step: Unimplemented"
