@@ -171,11 +171,11 @@ let cipher config s = s
   |> List.to_seq
   |> String.of_seq
 
-let _hours_worked = 9.9
+let _hours_worked = 10.1
 
 (*
   ________________________________________
-  | commit hash | hours used (approximate) |
+  | commit      | hours used (approximate) |
   |-------------|--------------------------|
   | aa5cbc7     | 1.5                      |
   | 1c96e63     | 0.5                      |
@@ -187,6 +187,7 @@ let _hours_worked = 9.9
   | bc39e1d     | 2.0                      |
   | 0d27a7e     | 2.0                      |
   | ea68839     | 0.7                      |
-  | UNKNOWN     | X.X                      |
+  | 854751a     | 0.5                      |
+  | HEAD        | 0.1                      |
   |_____________|__________________________|
 *)
