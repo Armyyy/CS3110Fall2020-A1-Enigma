@@ -10,7 +10,7 @@ let index_tests = [
 ]
 
 let map_r_to_l_tests = [
-  ("r_to_l identity wiring" >:: fun _ ->
+  ("r_to_l identity wiring top A" >:: fun _ ->
     assert_equal 0  (map_r_to_l "ABCDEFGHIJKLMNOPQRSTUVWXYZ" 'A' 0 ));
   ("r_to_l rotorI top A" >:: fun _ ->
     assert_equal 4  (map_r_to_l "EKMFLGDQVZNTOWYHXUSPAIBRCJ" 'A' 0 ));
@@ -20,30 +20,16 @@ let map_r_to_l_tests = [
     assert_equal 17 (map_r_to_l "BDFHJLCPRTXVZNYEIWGAKMUSQO" 'O' 14));
 ]
 
-(*
-let map_l_to_r_tests = []
-
-let map_refl_tests = []
-
-let map_plug_tests = []
-
-let cipher_char_tests = [
-    (* Identity machine: no plugs, no rotors, identity reflector. *)
-    ( "identity machine" >:: fun _ ->
-      assert_equal 'A'
-        (cipher_char
-           {
-             refl = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-             rotors = [];
-             plugboard = [];
-           }
-           'A') );
-  ]
-
-let step_tests = []
-
-let cipher_tests = []
-*)
+let map_l_to_r_tests = [
+  ("l_to_r identity wiring top A" >:: fun _ ->
+    assert_equal 0  (map_l_to_r "ABCDEFGHIJKLMNOPQRSTUVWXYZ" 'A' 0 ));
+  ("l_to_r rotorI top A" >:: fun _ ->
+    assert_equal 20 (map_l_to_r "EKMFLGDQVZNTOWYHXUSPAIBRCJ" 'A' 0));
+  ("l_to_r rotorI top B" >:: fun _ ->
+    assert_equal 21 (map_l_to_r "EKMFLGDQVZNTOWYHXUSPAIBRCJ" 'B' 0 ));
+  ("l_to_r rotorI top F input_pos 10" >:: fun _ ->
+    assert_equal 14 (map_l_to_r "EKMFLGDQVZNTOWYHXUSPAIBRCJ" 'F' 10));
+]
 
 
 let suite =
@@ -52,7 +38,7 @@ let suite =
          [
            index_tests;
            map_r_to_l_tests;
-(*         map_l_to_r_tests; *)
+           map_l_to_r_tests;
 (*         map_refl_tests; *)
 (*         map_plug_tests; *)
 (*         cipher_char_tests; *)

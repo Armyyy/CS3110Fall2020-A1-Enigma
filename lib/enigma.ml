@@ -4,6 +4,8 @@
 
 (* Step 3 *)
 let index c = Char.code c - Char.code 'A'
+let letter idx = Char.chr (idx + Char.code 'A')
+let wrap x = ((x mod 26) + 26) mod 26
 
 (* Step 5 *)
 (*
@@ -31,13 +33,40 @@ BDFHJLCPRTXVZNYEIWGAKMUSQO (rotor's wiring)
 let map_r_to_l wiring top_letter input_pos =
   let offset = index top_letter in
   let contact_out = (offset + input_pos) mod 26 in
-  let output = (index wiring.[contact_out] - offset) mod 26 in
-  if output < 0 then output + 26 else output
+  let output = (index wiring.[contact_out] - offset) in
+  wrap output
 
+(*
+0 2 4 6 8 10  14  18  22 25 (contact position)
+| | | | | |   |   |   |  |
+v v v v v v   v   v   v  v
+EKMFLGDQVZNTOWYHXUSPAIBRCJ (rotor's wiring)
+ABCDEFGHIJKLMNOPQRSTUVWXYZ (identity wiring)
+               ^
+               |_________________
+                                 |
+  offset = index top_letter      |
+        = index 'F'              |
+          = 5                    |
+   ______________________________|
+  |
+  v
+  contact_out = (offset + input_pos) mod 26
+              = (5 + 10) mod 26
+              = 15
 
-let map_l_to_r _wiring _top_letter _input_pos =
-  failwith "map_l_to_r: Unimplemented"
-
+  output = (String.index wiring identity_wiring.[contact_out] - offset) mod 26
+         = (String.index wiring identity_wiring.[15] - 5) mod 26
+         = (String.index wiring 'P' - 5) mod 26
+         = (String.index wiring 'P' - 5) mod 26
+         = (19 - 5) mod 26
+         = 14
+*)
+let map_l_to_r wiring top_letter input_pos =
+  let offset = index top_letter in
+  let contact_out = (offset + input_pos) mod 26 in
+  let output = String.index wiring (letter contact_out) - offset in
+  wrap output
 (* Step 6 *)
 let map_refl _wiring _input_pos = failwith "map_refl: Unimplemented"
 
